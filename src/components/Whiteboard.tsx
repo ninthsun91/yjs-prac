@@ -3,23 +3,27 @@
 import { useState } from 'react';
 import { Excalidraw } from '@excalidraw/excalidraw';
 import { useWindowEventListener } from '@/hooks/useWindowEventListener';
+import { doc } from '@/hooks/useYdoc';
 
 import type { AppState, BinaryFiles, ExcalidrawImperativeAPI } from '@excalidraw/excalidraw/types/types';
 import type { ExcalidrawElement } from '@excalidraw/excalidraw/types/element/types';
 
 export function Whiteboard() {
   const [excalidrawAPI, setExcalidrawAPI] = useState<ExcalidrawImperativeAPI>(null!);
+  const ymap = doc.getMap('map');
 
   const init = async (api: ExcalidrawImperativeAPI) => {
     setExcalidrawAPI(api);
   }
 
   const onChangeHandler = (elements: readonly ExcalidrawElement[], state: AppState, files: BinaryFiles) => {
+    ymap.set('elements', elements);
+    ymap.set('files', files);
     // console.log("onChange", elements, state, files);
-    if (state.activeTool.type === 'image' && state.cursorButton === 'down') {
-      const files = excalidrawAPI.getFiles();
-      console.log("files added", files);
-    }
+    // if (state.activeTool.type === 'image' && state.cursorButton === 'down') {
+    //   const files = excalidrawAPI.getFiles();
+    //   console.log("files added", files);
+    // }
   }
   
   useWindowEventListener('keydown', (e) => {
