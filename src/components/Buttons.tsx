@@ -1,13 +1,14 @@
 'use client';
 
-import { useDoc } from '@/hooks/useDoc';
+import { useDocContext } from '@/hooks/useDocContext';
 
 export function Buttons() {
-  const ymap = useDoc()?.getMap('map');
+  const context = useDocContext();
 
   const handler = () => {
-    if (!ymap) return;
+    if (!context) return;
 
+    const ymap = context.doc.getMap('map');
     const json = ymap.toJSON();
     console.log('ymap: ', json);
   }

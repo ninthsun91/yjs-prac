@@ -1,26 +1,27 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Excalidraw } from '@excalidraw/excalidraw';
 import { useWindowEventListener } from '@/hooks/useWindowEventListener';
-import { useDoc } from '@/hooks/useDoc';
+import { useDocContext } from '@/hooks/useDocContext';
 
 import type { AppState, BinaryFiles, ExcalidrawImperativeAPI } from '@excalidraw/excalidraw/types/types';
 import type { ExcalidrawElement } from '@excalidraw/excalidraw/types/element/types';
 
 export function Whiteboard() {
   const [excalidrawAPI, setExcalidrawAPI] = useState<ExcalidrawImperativeAPI>(null!);
-  const ymap = useDoc()?.getMap('map');
+  const context = useDocContext();
 
   const init = async (api: ExcalidrawImperativeAPI) => {
     setExcalidrawAPI(api);
   }
 
   const onChangeHandler = (elements: readonly ExcalidrawElement[], state: AppState, files: BinaryFiles) => {
-    if (ymap === undefined) {
+    if (!context) {
       console.log('ymap is null');
       return;
     }
+    const ymap = context.doc.getMap('map');
     ymap.set('elements', elements);
     ymap.set('files', files);
     // console.log("onChange", elements, state, files);
@@ -28,7 +29,6 @@ export function Whiteboard() {
     //   const files = excalidrawAPI.getFiles();
     //   console.log("files added", files);
     // }
-    console.log('map', ymap.toJSON());
   }
   
   useWindowEventListener('keydown', (e) => {
@@ -40,6 +40,16 @@ export function Whiteboard() {
       }, 500);
     } 
   });
+
+  useEffect(() => {
+    if (!context) return;
+
+    context.ws.connect();
+
+    return () => {
+      context.ws.disconnect();
+    };
+  }, [context]);
   
   return (
     <div className="border border-red-500 h-screen">
