@@ -3,20 +3,24 @@
 import { useState } from 'react';
 import { Excalidraw } from '@excalidraw/excalidraw';
 import { useWindowEventListener } from '@/hooks/useWindowEventListener';
-import { doc } from '@/hooks/useYdoc';
+import { useDoc } from '@/hooks/useDoc';
 
 import type { AppState, BinaryFiles, ExcalidrawImperativeAPI } from '@excalidraw/excalidraw/types/types';
 import type { ExcalidrawElement } from '@excalidraw/excalidraw/types/element/types';
 
 export function Whiteboard() {
   const [excalidrawAPI, setExcalidrawAPI] = useState<ExcalidrawImperativeAPI>(null!);
-  const ymap = doc.getMap('map');
+  const ymap = useDoc()?.getMap('map');
 
   const init = async (api: ExcalidrawImperativeAPI) => {
     setExcalidrawAPI(api);
   }
 
   const onChangeHandler = (elements: readonly ExcalidrawElement[], state: AppState, files: BinaryFiles) => {
+    if (ymap === undefined) {
+      console.log('ymap is null');
+      return;
+    }
     ymap.set('elements', elements);
     ymap.set('files', files);
     // console.log("onChange", elements, state, files);
@@ -24,6 +28,7 @@ export function Whiteboard() {
     //   const files = excalidrawAPI.getFiles();
     //   console.log("files added", files);
     // }
+    console.log('map', ymap.toJSON());
   }
   
   useWindowEventListener('keydown', (e) => {
