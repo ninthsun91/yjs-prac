@@ -12,7 +12,9 @@
     "@excalidraw/excalidraw": "^0.17.6",
     "next": "14.2.3",
     "react": "^18",
-    "react-dom": "^18"
+    "react-dom": "^18",
+    "y-websocket": "^2.0.3",
+    "yjs": "^13.6.15"
   },
   "devDependencies": {
     "@types/node": "^20",
