@@ -13,9 +13,11 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "lib0": "^0.2.94",
     "socket.io": "^4.7.5"
   },
   "devDependencies": {
+    "@excalidraw/excalidraw": "^0.17.6",
     "@types/node": "^20.12.12",
     "standard": "^17.1.0",
     "ts-node-dev": "^2.0.0",
