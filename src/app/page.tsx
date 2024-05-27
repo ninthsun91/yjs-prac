@@ -1,11 +1,9 @@
-import { Buttons } from '@/components/Buttons';
-import { Whiteboard } from '@/components/Whiteboard';
+import { Whiteboard2 } from '@/components/Whiteboard2';
 
 export default function Home() {
   return (
     <main>
-      <Buttons />
-      <Whiteboard />
+      <Whiteboard2 />
     </main>
   );
 }
