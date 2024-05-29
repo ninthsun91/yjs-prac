@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Excalidraw } from '@excalidraw/excalidraw';
 import { useWindowEventListener } from '@/hooks/useWindowEventListener';
 import { useDocContext } from '@/hooks/useDocContext';
@@ -9,12 +9,13 @@ import type { AppState, BinaryFiles, ExcalidrawImperativeAPI } from '@excalidraw
 import type { ExcalidrawElement } from '@excalidraw/excalidraw/types/element/types';
 
 export function Whiteboard() {
-  const [excalidrawAPI, setExcalidrawAPI] = useState<ExcalidrawImperativeAPI>(null!);
+  const apiRef = useRef<ExcalidrawImperativeAPI | null>(null);
   const [initialized, setInitialized] = useState(false);
   const context = useDocContext();
 
   const init = async (api: ExcalidrawImperativeAPI) => {
-    setExcalidrawAPI(api);
+    // setExcalidrawAPI(api);
+    apiRef.current = api;
   
     if (!context) return;
 
@@ -29,16 +30,6 @@ export function Whiteboard() {
   };
 
   const onChangeHandler = (elements: readonly ExcalidrawElement[], state: AppState, files: BinaryFiles) => {
-    if (!context) {
-      console.log('ymap is null');
-      return;
-    }
-    const ymap = context.doc.getMap('map');
-    ymap.set('elements', elements);
-    ymap.set('files', files);
-
-    console.log('onChange: elements', ymap.get('elements'));
-
     // console.log("onChange", elements, state, files);
     // if (state.activeTool.type === 'image' && state.cursorButton === 'down') {
     //   const files = excalidrawAPI.getFiles();
@@ -47,13 +38,31 @@ export function Whiteboard() {
   };
   
   useWindowEventListener('keydown', (e) => {
+    const api = apiRef.current;
+    if (api === null) return;
+
     const isCtrlOrCmd = e.metaKey || e.ctrlKey;
     if (isCtrlOrCmd && e.code === 'KeyV') {
       setTimeout(() => {
-        const files = excalidrawAPI.getFiles();
+        const files = api.getFiles();
         console.log("files pasted", files);
       }, 500);
     } 
+  });
+
+  useWindowEventListener('mouseup', (e) => {
+    const api = apiRef.current;
+    if (api === null) return;
+
+    const elements = api.getSceneElements();
+    const files = api.getFiles();
+    if (!context) {
+      console.log('ymap is null');
+      return;
+    }
+    const ymap = context.doc.getMap('map');
+    ymap.set('elements', elements);
+    ymap.set('files', files);
   });
 
   useEffect(() => {
@@ -63,13 +72,13 @@ export function Whiteboard() {
 
     const ymap = context.doc.getMap('map');
     ymap.observe((event) => {
-      // console.log('ymap changed', event);
+      const api = apiRef.current;
+      if (api === null) return;
+
       const elements = ymap.get('elements') as ExcalidrawElement[];
-      // console.log('ymap observe: elements', elements);
-      if (elements && excalidrawAPI) {
-        console.log('ymap observe: elements', elements)
-        excalidrawAPI.updateScene({ elements });
-      }
+      const files = ymap.get('files') as BinaryFiles;
+      api.updateScene({ elements });
+      if (files) api.addFiles(Object.values(files));
     });
 
     setInitialized(true);
