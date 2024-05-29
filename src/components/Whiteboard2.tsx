@@ -13,7 +13,7 @@ import type { AppState, BinaryFiles, ExcalidrawImperativeAPI } from '@excalidraw
 import type { ExcalidrawElement } from '@excalidraw/excalidraw/types/element/types';
 
 interface WhiteboardData {
-  elements: ExcalidrawElement[];
+  elements: readonly ExcalidrawElement[];
   files: BinaryFiles;
 }
 
@@ -37,13 +37,7 @@ export function Whiteboard2() {
     setInitialized(true);
   };
 
-  const onChangeHandler = (elements: readonly ExcalidrawElement[], state: AppState, files: BinaryFiles) => {
-    // console.log("onChange", elements, state, files);
-    // if (state.activeTool.type === 'image' && state.cursorButton === 'down') {
-    //   const files = excalidrawAPI.getFiles();
-    //   console.log("files added", files);
-    // }
-  };
+  const onChangeHandler = (elements: readonly ExcalidrawElement[], state: AppState, files: BinaryFiles) => {};
   
   useWindowEventListener('keydown', (e) => {
     const isCtrlOrCmd = e.metaKey || e.ctrlKey;
@@ -53,6 +47,12 @@ export function Whiteboard2() {
         console.log("files pasted", files);
       }, 500);
     }
+  });
+
+  useWindowEventListener('mouseup', (e) => {
+    const elements = excalidrawAPI.getSceneElements();
+    const files = excalidrawAPI.getFiles();
+    socket.emit('update', encodeData({ elements, files }));
   });
 
   const addSocketListeners = (socket: Socket) => {

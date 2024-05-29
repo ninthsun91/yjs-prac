@@ -57,7 +57,8 @@ io.on('connection', (socket) => {
   socket.emit('sync', encodeData(data));
 
   socket.on('update', (data: any) => {
-    console.log('update: ', data);
+    // socket.emit('sync', data);
+    socket.broadcast.to(projectId).emit('sync', data);
   })
 });
 
