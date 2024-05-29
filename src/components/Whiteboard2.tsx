@@ -60,9 +60,11 @@ export function Whiteboard2() {
       console.log('connected to socket server', socket.id);
     });
 
-    socket.on('sync', (data: any) => {
-      console.log('sync', decodeData(data));
-      excalidrawAPI.updateScene(decodeData(data));
+    socket.on('sync', (buffer: ArrayBuffer) => {
+      const data = decodeData(buffer);
+      console.log('sync', data);
+      excalidrawAPI.updateScene(data);
+      if (data.files) excalidrawAPI.addFiles(Object.values(data.files));
     })
   }
 

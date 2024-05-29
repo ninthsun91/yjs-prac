@@ -56,8 +56,9 @@ io.on('connection', (socket) => {
   const data = db.get(projectId);
   socket.emit('sync', encodeData(data));
 
-  socket.on('update', (data: any) => {
+  socket.on('update', (data: Uint8Array) => {
     // socket.emit('sync', data);
+    console.log('update size: ', data.byteLength / 1024, 'KB');
     socket.broadcast.to(projectId).emit('sync', data);
   })
 });
