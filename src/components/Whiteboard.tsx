@@ -21,7 +21,7 @@ export function Whiteboard() {
     apiRef.current = api;
     console.log('init excalidraw', api, sync);
 
-    await sync.connect();
+    await sync.connect(ROOM_ID);
     fetchInitialData();
     setSyncListener();
 
@@ -87,7 +87,7 @@ export function Whiteboard() {
   });
 
   useEffect(() => {
-    const sync = new WhiteboardSync(ROOM_ID);
+    const sync = WhiteboardSync.getInstance();
     setSync(sync);
 
     return () => {
