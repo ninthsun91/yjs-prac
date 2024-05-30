@@ -3,31 +3,56 @@
 import { useEffect, useRef, useState } from 'react';
 import { Excalidraw } from '@excalidraw/excalidraw';
 import { useWindowEventListener } from '@/hooks/useWindowEventListener';
-import { useDocContext } from '@/hooks/useDocContext';
 
 import type { AppState, BinaryFiles, ExcalidrawImperativeAPI } from '@excalidraw/excalidraw/types/types';
 import type { ExcalidrawElement } from '@excalidraw/excalidraw/types/element/types';
+import { WhiteboardSync } from '@/providers/WhiteboardSync';
+
+const ROOM_ID = 'project-id';
 
 export function Whiteboard() {
-  const apiRef = useRef<ExcalidrawImperativeAPI | null>(null);
+  const apiRef = useRef<ExcalidrawImperativeAPI>(null!);
+  const [sync, setSync] = useState<WhiteboardSync>(null!);
   const [initialized, setInitialized] = useState(false);
-  const context = useDocContext();
 
   const init = async (api: ExcalidrawImperativeAPI) => {
-    // setExcalidrawAPI(api);
+    if (initialized) return;
+    
     apiRef.current = api;
-  
-    if (!context) return;
+    console.log('init excalidraw', api, sync);
 
-    const ymap = context.doc.getMap('map');
-    const elements = ymap.get('elements') as ExcalidrawElement[];
-    console.log('init ymap elements', elements);
-    if (elements) {
-      console.log('init: elements', elements);
-      api.updateScene({ elements });
-      console.log('init update scene', api.getSceneElements());
-    }
+    await sync.connect();
+    fetchInitialData();
+    setSyncListener();
+
+    setInitialized(true);
   };
+
+  const fetchInitialData = () => {
+    const api = apiRef.current;
+    const map = sync.getData(ROOM_ID);
+
+    const elements = map.get('elements') as ExcalidrawElement[];
+    const files = map.get('files') as BinaryFiles;
+    if (elements) api.updateScene({ elements });
+    if (files) api.addFiles(Object.values(files));
+  }
+
+  const setSyncListener = () => {
+    const api = apiRef.current;
+    const map = sync.getData(ROOM_ID);
+    
+    map.observe((event) => {
+      if (event.keysChanged.has('elements')) {
+        const elements = map.get('elements') as ExcalidrawElement[];
+        api.updateScene({ elements });
+      }
+      if (event.keysChanged.has('files')) {
+        const files = map.get('files') as BinaryFiles;
+        api.addFiles(Object.values(files));
+      }
+    });
+  }
 
   const onChangeHandler = (elements: readonly ExcalidrawElement[], state: AppState, files: BinaryFiles) => {
     // console.log("onChange", elements, state, files);
@@ -39,7 +64,6 @@ export function Whiteboard() {
   
   useWindowEventListener('keydown', (e) => {
     const api = apiRef.current;
-    if (api === null) return;
 
     const isCtrlOrCmd = e.metaKey || e.ctrlKey;
     if (isCtrlOrCmd && e.code === 'KeyV') {
@@ -51,51 +75,32 @@ export function Whiteboard() {
   });
 
   useWindowEventListener('mouseup', (e) => {
+    if (!initialized) return;
+
     const api = apiRef.current;
-    if (api === null) return;
+    const map = sync.getData(ROOM_ID);
 
     const elements = api.getSceneElements();
     const files = api.getFiles();
-    if (!context) {
-      console.log('ymap is null');
-      return;
-    }
-    const ymap = context.doc.getMap('map');
-    ymap.set('elements', elements);
-    ymap.set('files', files);
+    map.set('elements', elements);
+    map.set('files', files);
   });
 
   useEffect(() => {
-    if (!context) return;
-
-    context.ws.connect();
-
-    const ymap = context.doc.getMap('map');
-    ymap.observe((event) => {
-      const api = apiRef.current;
-      if (api === null) return;
-
-      const elements = ymap.get('elements') as ExcalidrawElement[];
-      const files = ymap.get('files') as BinaryFiles;
-      api.updateScene({ elements });
-      if (files) api.addFiles(Object.values(files));
-    });
-
-    setInitialized(true);
+    const sync = new WhiteboardSync(ROOM_ID);
+    setSync(sync);
 
     return () => {
-      context.ws.disconnect();
+      sync.disconnect();
     };
-  }, [context]);
+  }, []);
   
   return (
     <div className="border border-red-500 h-screen">
-      {initialized && (
-        <Excalidraw
-          excalidrawAPI={init}
-          onChange={onChangeHandler}
-        />
-      )}
+      <Excalidraw
+        excalidrawAPI={init}
+        onChange={onChangeHandler}
+      />
     </div>
   );
 }
