@@ -28,12 +28,18 @@ export function Whiteboard() {
   };
 
   const onChangeHandler = (elements: readonly ExcalidrawElement[], state: AppState, files: BinaryFiles) => {
-    // console.log("onChange", elements, state, files);
+    // console.log("onChange", state);
     // if (state.activeTool.type === 'image' && state.cursorButton === 'down') {
     //   const files = excalidrawAPI.getFiles();
     //   console.log("files added", files);
     // }
   };
+
+  const updateWhiteboard = () => {
+    if (initialized) sync.update();
+  };
+  useWindowEventListener('focusout', updateWhiteboard);
+  useWindowEventListener('click', updateWhiteboard);
   
   useWindowEventListener('keydown', (e) => {
     const api = apiRef.current;
@@ -45,11 +51,6 @@ export function Whiteboard() {
         console.log("files pasted", files);
       }, 500);
     } 
-  });
-
-  useWindowEventListener('mouseup', (e) => {
-    if (!initialized) return;
-    sync.update();
   });
 
   useEffect(() => {
@@ -66,6 +67,10 @@ export function Whiteboard() {
       <Excalidraw
         excalidrawAPI={init}
         onChange={onChangeHandler}
+        onPaste={(data, event) => {
+          console.log('onPaste', data, event)
+          return true;
+        }}
       />
     </div>
   );
