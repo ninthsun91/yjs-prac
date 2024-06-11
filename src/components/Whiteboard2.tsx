@@ -1,12 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect } from 'react';
 import { Excalidraw } from '@excalidraw/excalidraw';
 import { io, Socket } from 'socket.io-client';
 
 import * as encoding from 'lib0/encoding';
 import * as decoding from 'lib0/decoding';
 
+import { useCallbackRefState } from '@/hooks/useCallbackStateRef';
 import { useWindowEventListener } from '@/hooks/useWindowEventListener';
 
 import type { AppState, BinaryFiles, ExcalidrawImperativeAPI } from '@excalidraw/excalidraw/types/types';
@@ -29,17 +30,12 @@ const socket = io('http://localhost:3333', {
 });
 
 export function Whiteboard2() {
-  const [excalidrawAPI, setExcalidrawAPI] = useState<ExcalidrawImperativeAPI>(null!);
-  const [initialized, setInitialized] = useState(false);
+  const [excalidrawAPI, excalidrawRefCallback] = useCallbackRefState<ExcalidrawImperativeAPI>();
 
-  const init = async (api: ExcalidrawImperativeAPI) => {
-    setExcalidrawAPI(api);
-    setInitialized(true);
-  };
+  const onChangeHandler = (elements: readonly ExcalidrawElement[], state: AppState, files: BinaryFiles) => { };
 
-  const onChangeHandler = (elements: readonly ExcalidrawElement[], state: AppState, files: BinaryFiles) => {};
-  
   useWindowEventListener('keydown', (e) => {
+    if (!excalidrawAPI) return;
     const isCtrlOrCmd = e.metaKey || e.ctrlKey;
     if (isCtrlOrCmd && e.code === 'KeyV') {
       setTimeout(() => {
@@ -50,12 +46,13 @@ export function Whiteboard2() {
   });
 
   useWindowEventListener('mouseup', (e) => {
+    if (!excalidrawAPI) return;
     const elements = excalidrawAPI.getSceneElements();
     const files = excalidrawAPI.getFiles();
     socket.emit('update', encodeData({ elements, files }));
   });
 
-  const addSocketListeners = (socket: Socket) => {
+  const addSocketListeners = useCallback((socket: Socket) => {
     socket.on('connect', () => {
       console.log('connected to socket server', socket.id);
     });
@@ -63,10 +60,10 @@ export function Whiteboard2() {
     socket.on('sync', (buffer: ArrayBuffer) => {
       const data = decodeData(buffer);
       console.log('sync', data);
-      excalidrawAPI.updateScene(data);
-      if (data.files) excalidrawAPI.addFiles(Object.values(data.files));
+      excalidrawAPI!.updateScene(data);
+      if (data.files) excalidrawAPI!.addFiles(Object.values(data.files));
     })
-  }
+  }, [excalidrawAPI])
 
   useEffect(() => {
     return () => {
@@ -75,16 +72,16 @@ export function Whiteboard2() {
   }, []);
 
   useEffect(() => {
-    if (!initialized) return;
+    if (!excalidrawAPI) return;
 
     socket.connect();
     addSocketListeners(socket);
-  }, [initialized]);
-  
+  }, [excalidrawAPI, addSocketListeners]);
+
   return (
     <div className="border border-red-500 h-screen">
       <Excalidraw
-        excalidrawAPI={init}
+        excalidrawAPI={excalidrawRefCallback}
         onChange={onChangeHandler}
       />
     </div>
