@@ -46,9 +46,11 @@ export function Whiteboard2() {
   });
 
   useWindowEventListener('mouseup', (e) => {
+    e.preventDefault();
     if (!excalidrawAPI) return;
     const elements = excalidrawAPI.getSceneElements();
     const files = excalidrawAPI.getFiles();
+    console.log('update', elements);
     socket.emit('update', encodeData({ elements, files }));
   });
 
@@ -59,8 +61,8 @@ export function Whiteboard2() {
 
     socket.on('sync', (buffer: ArrayBuffer) => {
       const data = decodeData(buffer);
-      console.log('sync', data);
-      excalidrawAPI!.updateScene(data);
+      const { elements, appState } = reconcileData(excalidrawAPI!, data);
+      excalidrawAPI!.updateScene({ elements, appState });
       if (data.files) excalidrawAPI!.addFiles(Object.values(data.files));
     })
   }, [excalidrawAPI])
@@ -97,4 +99,40 @@ function encodeData(data: WhiteboardData): Uint8Array {
   const encoder = encoding.createEncoder();
   encoding.writeAny(encoder, data);
   return encoding.toUint8Array(encoder);
+}
+
+function reconcileData(api: ExcalidrawImperativeAPI, remoteData: WhiteboardData) {
+  const localData = api.getSceneElementsIncludingDeleted();
+  const localState = api.getAppState();
+
+  const localElementMap = arrayToMap(localData);
+  remoteData.elements.forEach((element) => {
+    if (localElementMap.has(element.id)) {
+      const localElement = localElementMap.get(element.id)!;
+      localElementMap.set(element.id, convergeElements(localElement, element));
+    } else {
+      localElementMap.set(element.id, element);
+    }
+  })
+
+  const reconciledElements = [...localElementMap.values()];
+
+  return {
+    elements: reconciledElements,
+    appState: localState,
+  }
+}
+
+function arrayToMap(elements: readonly ExcalidrawElement[]): Map<string, ExcalidrawElement> {
+  return elements.reduce((acc, element) => {
+    acc.set(element.id, element);
+    return acc;
+  }, new Map<string, ExcalidrawElement>());
+}
+
+function convergeElements(local: ExcalidrawElement, remote: ExcalidrawElement): ExcalidrawElement {
+  if (local.version > remote.version) return local;
+  if (remote.version > local.version) return remote;
+  if (local.versionNonce <= remote.versionNonce) return local;
+  return remote;
 }
