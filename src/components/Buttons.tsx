@@ -1,21 +1,21 @@
-'use client';
+'use client'
 
-import { useDocContext } from '@/hooks/useDocContext';
+import { useDocContext } from '@/hooks/useDocContext'
 
-export function Buttons() {
-  const context = useDocContext();
+export function Buttons () {
+  const context = useDocContext()
 
   const handler = () => {
-    if (!context) return;
+    if (context == null) return
 
-    const ymap = context.doc.getMap('map');
-    const json = ymap.toJSON();
-    console.log('ymap: ', json);
+    const ymap = context.doc.getMap('map')
+    const json = ymap.toJSON()
+    console.log('ymap: ', json)
   }
 
   return (
     <div>
-      <button className="border border-black" onClick={handler}>Log YMap</button>
+      <button className='border border-black' onClick={handler}>Log YMap</button>
     </div>
-  );
+  )
 }

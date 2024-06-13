@@ -7,7 +7,7 @@
     "build": "pnpm lint && tsc",
     "start": "node dist/index.js",
     "dev": "tsnd --respawn src/index.ts",
-    "lint": "standard ./src/**/*.ts --fix"
+    "lint": "ts-standard ./src/**/*.ts --fix"
   },
   "keywords": [],
   "author": "",
@@ -19,8 +19,8 @@
   "devDependencies": {
     "@excalidraw/excalidraw": "^0.17.6",
     "@types/node": "^20.12.12",
-    "standard": "^17.1.0",
     "ts-node-dev": "^2.0.0",
+    "ts-standard": "^12.0.2",
     "typescript": "^5.4.5"
   }
 }
