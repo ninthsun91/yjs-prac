@@ -85,23 +85,40 @@ function encodeData (data: WhiteboardData): Uint8Array {
 }
 
 function reconcileData (api: ExcalidrawImperativeAPI, remoteData: WhiteboardData) {
-  const localData = api.getSceneElementsIncludingDeleted()
+  const localElements = api.getSceneElementsIncludingDeleted()
   const localState = api.getAppState()
 
-  const localElementMap = arrayToMap(localData)
-  remoteData.elements.forEach((element) => {
-    if (localElementMap.has(element.id)) {
-      const localElement = localElementMap.get(element.id)!
-      localElementMap.set(element.id, convergeElements(localElement, element))
+  const localElementMap = arrayToMap(localElements)
+  const converged = new Map<string, ExcalidrawElement>()
+
+  remoteData.elements.forEach((remoteElement) => {
+    if (converged.has(remoteElement.id)) return
+
+    if (localElementMap.has(remoteElement.id)) {
+      // element exists in both local and remote
+      const localElement = localElementMap.get(remoteElement.id)!
+      if (shouldDiscardRemoteElement(localElement, localState, remoteElement)) {
+        converged.set(localElement.id, localElement)
+      } else {
+        converged.set(remoteElement.id, remoteElement)
+      }
+      converged.set(remoteElement.id, remoteElement)
     } else {
-      localElementMap.set(element.id, element)
+      // newly added remote element
+      converged.set(remoteElement.id, remoteElement)
     }
   })
 
-  const reconciledElements = [...localElementMap.values()]
+  // elements deleted in remote, but exist in local
+  localElements
+    .filter(localElement => !converged.has(localElement.id))
+    .forEach(localElement => {
+      // keep local elements in editing
+      if (isLocalElementEditing(localElement, localState)) converged.set(localElement.id, localElement)
+    })
 
   return {
-    elements: reconciledElements,
+    elements: [...converged.values()],
     appState: localState
   }
 }
@@ -113,11 +130,22 @@ function arrayToMap (elements: readonly ExcalidrawElement[]): Map<string, Excali
   }, new Map<string, ExcalidrawElement>())
 }
 
-function convergeElements (local: ExcalidrawElement, remote: ExcalidrawElement): ExcalidrawElement {
-  if (local.version > remote.version) return local
-  if (remote.version > local.version) return remote
-  if (local.versionNonce <= remote.versionNonce) return local
-  return remote
+function shouldDiscardRemoteElement (local: ExcalidrawElement, localState: AppState, remote: ExcalidrawElement): boolean {
+  return (
+    isLocalElementEditing(local, localState) ||
+    local.version > remote.version ||
+    (local.version === remote.version &&
+      local.versionNonce < remote.versionNonce
+    )
+  )
+}
+
+function isLocalElementEditing (local: ExcalidrawElement, localState: AppState): boolean {
+  return (
+    local.id === localState.editingElement?.id ||
+    local.id === localState.resizingElement?.id ||
+    local.id === localState.draggingElement?.id
+  )
 }
 
 function hashElementsVersion (elements: readonly ExcalidrawElement[]): number {

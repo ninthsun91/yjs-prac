@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Excalidraw } from '@excalidraw/excalidraw'
 
 import { useCallbackRefState } from '@/hooks/useCallbackStateRef'
+import { useDocumentEventListener } from '@/hooks/useDocumentEventListener'
 import { useIndexeddb } from '@/hooks/useIndexedDB'
 import { useSocketio } from '@/hooks/useSocketio'
 
@@ -35,6 +36,16 @@ export function Whiteboard2 () {
 
     addSocketListeners()
   }, [excalidrawAPI, isConnected, addSocketListeners])
+
+  const updateScene = () => {
+    const elements = excalidrawAPI!.getSceneElements()
+    update(elements)
+  }
+
+  useDocumentEventListener('focusout', updateScene)
+  useDocumentEventListener('keydown', (e) => {
+    if (e.key === 'Backspace' || e.key === 'Delete') updateScene()
+  })
 
   return (
     <div className='border border-red-500 h-screen'>
