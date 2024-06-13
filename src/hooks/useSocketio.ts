@@ -7,16 +7,22 @@ import type { ExcalidrawElement } from '@excalidraw/excalidraw/types/element/typ
 
 const CONNECTION_URL = 'http://localhost:3333'
 
-type WhiteboardData = {
+interface WhiteboardData {
   elements: readonly ExcalidrawElement[]
 }
 
 export const useSocketio = (projectId: string) => {
-  const [socket, setSocket] = useState<Socket>(null!);
-  const [isConnected, setIsConnected] = useState<boolean>(false);
+  const [socket, setSocket] = useState<Socket>(null!)
+  const [isConnected, setIsConnected] = useState<boolean>(false)
+  const [lastHashVersion, setLastHashVersion] = useState<number>(-1)
 
   const update = (elements: readonly ExcalidrawElement[]) => {
+    const hashVersion = hashElementsVersion(elements)
+    console.log('hash version ', elements, hashVersion);
+    if (hashVersion === lastHashVersion) return
+
     socket.emit('update', encodeData({ elements }))
+    setLastHashVersion(hashVersion)
   }
 
   const listenSync = (api: ExcalidrawImperativeAPI) => {
@@ -40,11 +46,11 @@ export const useSocketio = (projectId: string) => {
       console.log('socket.io connected', socket.id)
       setIsConnected(true)
     })
-    setSocket(socket);
+    setSocket(socket)
 
     return () => {
       if (socket.connected) {
-        socket.disconnect();
+        socket.disconnect()
         console.log('socket.io disconnected', socket.id, socket.disconnected)
         setIsConnected(false)
       }
@@ -105,3 +111,10 @@ function convergeElements(local: ExcalidrawElement, remote: ExcalidrawElement): 
   return remote
 }
 
+function hashElementsVersion(elements: readonly ExcalidrawElement[]): number {
+  let hash = 5381
+  elements.forEach((element) => {
+    hash = (hash << 5) + hash + element.versionNonce
+  })
+  return hash >>> 0
+}

@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Excalidraw } from '@excalidraw/excalidraw'
 
 import { useCallbackRefState } from '@/hooks/useCallbackStateRef'
@@ -10,13 +10,19 @@ import { useSocketio } from '@/hooks/useSocketio'
 import type { AppState, BinaryFiles, ExcalidrawImperativeAPI } from '@excalidraw/excalidraw/types/types'
 import type { ExcalidrawElement } from '@excalidraw/excalidraw/types/element/types'
 
-const projectId = 'project-id';
+const projectId = 'project-id'
 
-export function Whiteboard2() {
+export function Whiteboard2 () {
   const [excalidrawAPI, excalidrawRefCallback] = useCallbackRefState<ExcalidrawImperativeAPI>()
+  const [cursor, setCursor] = useState<'up' | 'down'>('up')
   const { isConnected, listenSync, update } = useSocketio(projectId)
 
-  const onChangeHandler = (elements: readonly ExcalidrawElement[], state: AppState, files: BinaryFiles) => { }
+  const onChangeHandler = (elements: readonly ExcalidrawElement[], state: AppState, files: BinaryFiles) => {
+    if (cursor === 'down' && state.cursorButton === 'up') {
+      update(elements)
+    }
+    if (cursor !== state.cursorButton) setCursor(state.cursorButton)
+  }
 
   useWindowEventListener('keydown', (e) => {
     if (excalidrawAPI == null) return
@@ -55,4 +61,3 @@ export function Whiteboard2() {
     </div>
   )
 }
-
