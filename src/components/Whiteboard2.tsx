@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Excalidraw } from '@excalidraw/excalidraw'
 
 import { useCallbackRefState } from '@/hooks/useCallbackStateRef'
-import { useWindowEventListener } from '@/hooks/useWindowEventListener'
+import { useIndexeddb } from '@/hooks/useIndexedDB'
 import { useSocketio } from '@/hooks/useSocketio'
 
 import type { AppState, BinaryFiles, ExcalidrawImperativeAPI } from '@excalidraw/excalidraw/types/types'
@@ -16,31 +16,15 @@ export function Whiteboard2 () {
   const [excalidrawAPI, excalidrawRefCallback] = useCallbackRefState<ExcalidrawImperativeAPI>()
   const [cursor, setCursor] = useState<'up' | 'down'>('up')
   const { isConnected, listenSync, update } = useSocketio(projectId)
+  const db = useIndexeddb(projectId)
 
   const onChangeHandler = (elements: readonly ExcalidrawElement[], state: AppState, files: BinaryFiles) => {
     if (cursor === 'down' && state.cursorButton === 'up') {
       update(elements)
+      db.set({ elements, state, files })
     }
     if (cursor !== state.cursorButton) setCursor(state.cursorButton)
   }
-
-  useWindowEventListener('keydown', (e) => {
-    if (excalidrawAPI == null) return
-    const isCtrlOrCmd = e.metaKey || e.ctrlKey
-    if (isCtrlOrCmd && e.code === 'KeyV') {
-      setTimeout(() => {
-        const files = excalidrawAPI.getFiles()
-        console.log('files pasted', files)
-      }, 500)
-    }
-  })
-
-  useWindowEventListener('mouseup', (e) => {
-    e.preventDefault()
-    if (excalidrawAPI == null) return
-    const elements = excalidrawAPI.getSceneElements()
-    update(elements)
-  })
 
   const addSocketListeners = useCallback(() => {
     listenSync(excalidrawAPI!)
