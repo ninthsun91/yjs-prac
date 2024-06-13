@@ -61,6 +61,11 @@ io.on('connection', async (socket) => {
     console.log('update size: ', data.byteLength / 1024, 'KB')
     socket.broadcast.to(projectId).emit('sync', data)
   })
+
+  socket.on('room-size', (callback) => {
+    const size = io.sockets.adapter.rooms.get(projectId)?.size || 0
+    callback(size)
+  })
 })
 
 io.listen(3333)

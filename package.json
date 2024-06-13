@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint && ts-standard --fix"
+    "lint": "next lint && ts-standard --fix && pnpm lint:socket",
+    "lint:socket": "cd server && pnpm lint"
   },
   "dependencies": {
     "@excalidraw/excalidraw": "^0.17.6",

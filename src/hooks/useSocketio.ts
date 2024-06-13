@@ -18,7 +18,7 @@ export const useSocketio = (projectId: string) => {
 
   const update = (elements: readonly ExcalidrawElement[]) => {
     const hashVersion = hashElementsVersion(elements)
-    console.log('hash version ', elements, hashVersion);
+    console.log('hash version ', elements, hashVersion)
     if (hashVersion === lastHashVersion) return
 
     socket.emit('update', encodeData({ elements }))
@@ -42,9 +42,18 @@ export const useSocketio = (projectId: string) => {
       withCredentials: true,
       autoConnect: true
     })
-    socket.on('connect', () => {
+    socket.on('connect', async () => {
       console.log('socket.io connected', socket.id)
       setIsConnected(true)
+
+      const size = await socket.emitWithAck('room-size')
+      if (size === 1) {
+        console.log('should fetch data from server')
+      } else if (size === 0) {
+        console.log('something went wrong... room size cannot be 0')
+      } else {
+        console.log('should fetch data from peers')
+      }
     })
     setSocket(socket)
 
@@ -64,18 +73,18 @@ export const useSocketio = (projectId: string) => {
   }
 }
 
-function decodeData(data: ArrayBuffer): WhiteboardData {
+function decodeData (data: ArrayBuffer): WhiteboardData {
   const decoder = decoding.createDecoder(new Uint8Array(data))
   return decoding.readAny(decoder)
 }
 
-function encodeData(data: WhiteboardData): Uint8Array {
+function encodeData (data: WhiteboardData): Uint8Array {
   const encoder = encoding.createEncoder()
   encoding.writeAny(encoder, data)
   return encoding.toUint8Array(encoder)
 }
 
-function reconcileData(api: ExcalidrawImperativeAPI, remoteData: WhiteboardData) {
+function reconcileData (api: ExcalidrawImperativeAPI, remoteData: WhiteboardData) {
   const localData = api.getSceneElementsIncludingDeleted()
   const localState = api.getAppState()
 
@@ -97,21 +106,21 @@ function reconcileData(api: ExcalidrawImperativeAPI, remoteData: WhiteboardData)
   }
 }
 
-function arrayToMap(elements: readonly ExcalidrawElement[]): Map<string, ExcalidrawElement> {
+function arrayToMap (elements: readonly ExcalidrawElement[]): Map<string, ExcalidrawElement> {
   return elements.reduce((acc, element) => {
     acc.set(element.id, element)
     return acc
   }, new Map<string, ExcalidrawElement>())
 }
 
-function convergeElements(local: ExcalidrawElement, remote: ExcalidrawElement): ExcalidrawElement {
+function convergeElements (local: ExcalidrawElement, remote: ExcalidrawElement): ExcalidrawElement {
   if (local.version > remote.version) return local
   if (remote.version > local.version) return remote
   if (local.versionNonce <= remote.versionNonce) return local
   return remote
 }
 
-function hashElementsVersion(elements: readonly ExcalidrawElement[]): number {
+function hashElementsVersion (elements: readonly ExcalidrawElement[]): number {
   let hash = 5381
   elements.forEach((element) => {
     hash = (hash << 5) + hash + element.versionNonce
