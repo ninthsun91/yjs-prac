@@ -13,7 +13,7 @@ import type { ExcalidrawElement } from '@excalidraw/excalidraw/types/element/typ
 
 const projectId = 'project-id'
 
-export function Whiteboard2() {
+export function Whiteboard2 () {
   const [excalidrawAPI, excalidrawRefCallback] = useCallbackRefState<ExcalidrawImperativeAPI>()
   const [cursor, setCursor] = useState<'up' | 'down'>('up')
   const io = useSocketio(projectId)
@@ -42,7 +42,6 @@ export function Whiteboard2() {
     console.log('use effect', io.isConnected)
     if (!io.isConnected) return
     addSocketListeners()
-
   }, [io, addSocketListeners])
 
   const updateScene = () => io.update(excalidrawAPI!.getSceneElements())

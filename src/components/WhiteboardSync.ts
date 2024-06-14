@@ -3,17 +3,18 @@ import * as encoding from 'lib0/encoding'
 import * as decoding from 'lib0/decoding'
 import type { AppState, BinaryFiles, ExcalidrawImperativeAPI } from '@excalidraw/excalidraw/types/types'
 import type { ExcalidrawElement } from '@excalidraw/excalidraw/types/element/types'
+import type { WhiteboardData } from './Whiteboard3'
 
 export class WhiteboardSync {
   private static instance: WhiteboardSync
 
-  private roomId: string = 'project-id'
+  private readonly roomId: string = 'project-id'
   private lastHashVersion: number = -1
 
   private readonly socket: Socket
   private readonly api: ExcalidrawImperativeAPI
 
-  constructor(api: ExcalidrawImperativeAPI, projectId: string) {
+  constructor (api: ExcalidrawImperativeAPI, projectId: string) {
     this.disconnect()
     const url = 'http://localhost:3333'
 
@@ -23,60 +24,77 @@ export class WhiteboardSync {
       auth: { token: 'auth-token' },
       query: { projectId },
       withCredentials: true,
-      autoConnect: false,
+      autoConnect: false
     })
   }
 
-  static getInstance(api: ExcalidrawImperativeAPI, projectId: string): WhiteboardSync {
+  static getInstance (api: ExcalidrawImperativeAPI, projectId: string): WhiteboardSync {
     if (!WhiteboardSync.instance) {
       WhiteboardSync.instance = new WhiteboardSync(api, projectId)
     }
     return WhiteboardSync.instance
   }
 
-  public async connect() {
-    return new Promise<void>((resolve) => {
+  public async connect () {
+    return await new Promise<number>((resolve) => {
       this.socket.connect()
-      this.socket.on('connect', () => {
+      this.socket.on('connect', async () => {
         console.log('socket.io connected ', this.socket.id)
-        resolve()
+        const count = await this.socket.emitWithAck('room-size')
+        resolve(count)
       })
     })
   }
 
-  public disconnect() {
+  public disconnect () {
     if (this.socket?.connected) this.socket.disconnect()
   }
 
-  public listen() {
-    this.socket.on('sync', (buffer: ArrayBuffer) => {
+  public listen (
+    save: (data: WhiteboardData) => Promise<void>,
+    load: () => Promise<WhiteboardData>
+  ) {
+    console.log('add socket.io listeners')
+    this.socket.on('sync', async (buffer: ArrayBuffer) => {
       const remoteData = decodeData(buffer)
       const { elements, appState } = reconcileData(this.api, remoteData.elements)
       this.api.updateScene({ elements, appState })
+
+      await save({
+        elements
+        // state: appState,
+        // files: this.api.getFiles()
+      })
     })
+
+    this.socket.on('fetch-data', (callback) => { })
   }
 
-  public update(elements: readonly ExcalidrawElement[]): void {
+  public update (elements: readonly ExcalidrawElement[]): void {
     const hashVersion = hashElementsVersion(elements)
     if (hashVersion === this.lastHashVersion) return
 
     this.socket.emit('update', encodeData({ elements }))
     this.lastHashVersion = hashVersion
   }
+
+  public async fetchFromPeer (): Promise<{ elements: ExcalidrawElement[] }> {
+    return { elements: [] }
+  }
 }
 
-function decodeData(data: ArrayBuffer): { elements: ExcalidrawElement[] } {
+function decodeData (data: ArrayBuffer): { elements: ExcalidrawElement[] } {
   const decoder = decoding.createDecoder(new Uint8Array(data))
   return decoding.readAny(decoder)
 }
 
-function encodeData(data: any): Uint8Array {
+function encodeData (data: any): Uint8Array {
   const encoder = encoding.createEncoder()
   encoding.writeAny(encoder, data)
   return encoding.toUint8Array(encoder)
 }
 
-function reconcileData(api: ExcalidrawImperativeAPI, remoteElements: ExcalidrawElement[]): {
+function reconcileData (api: ExcalidrawImperativeAPI, remoteElements: ExcalidrawElement[]): {
   elements: ExcalidrawElement[]
   appState: AppState
 } {
@@ -111,14 +129,14 @@ function reconcileData(api: ExcalidrawImperativeAPI, remoteElements: ExcalidrawE
   }
 }
 
-function arrayToMap(elements: readonly ExcalidrawElement[]): Map<string, ExcalidrawElement> {
+function arrayToMap (elements: readonly ExcalidrawElement[]): Map<string, ExcalidrawElement> {
   return elements.reduce((acc, element) => {
     acc.set(element.id, element)
     return acc
   }, new Map<string, ExcalidrawElement>())
 }
 
-function shouldDiscardRemoteElement(local: ExcalidrawElement | undefined, localState: AppState, remote: ExcalidrawElement): local is ExcalidrawElement {
+function shouldDiscardRemoteElement (local: ExcalidrawElement | undefined, localState: AppState, remote: ExcalidrawElement): local is ExcalidrawElement {
   return (
     // element exist in both local and remote
     !(local == null) && (
@@ -134,7 +152,7 @@ function shouldDiscardRemoteElement(local: ExcalidrawElement | undefined, localS
   )
 }
 
-function isLocalElementEditing(local: ExcalidrawElement, localState: AppState): boolean {
+function isLocalElementEditing (local: ExcalidrawElement, localState: AppState): boolean {
   return (
     local.id === localState.editingElement?.id ||
     local.id === localState.resizingElement?.id ||
@@ -142,11 +160,10 @@ function isLocalElementEditing(local: ExcalidrawElement, localState: AppState): 
   )
 }
 
-function hashElementsVersion(elements: readonly ExcalidrawElement[]): number {
+function hashElementsVersion (elements: readonly ExcalidrawElement[]): number {
   let hash = 5381
   elements.forEach((element) => {
     hash = (hash << 5) + hash + element.versionNonce
   })
   return hash >>> 0
 }
-
