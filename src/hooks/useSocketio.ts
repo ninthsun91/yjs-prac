@@ -7,16 +7,20 @@ import type { ExcalidrawElement } from '@excalidraw/excalidraw/types/element/typ
 
 const CONNECTION_URL = 'http://localhost:3333'
 
-interface WhiteboardData {
-  elements: readonly ExcalidrawElement[]
+interface UseSocketio {
+  isConnected: boolean
+  listenSync: (api: ExcalidrawImperativeAPI) => void
+  update: (elements: readonly ExcalidrawElement[]) => void
 }
 
-export const useSocketio = (projectId: string) => {
-  const [socket, setSocket] = useState<Socket>(null!)
+export const useSocketio = (projectId: string): UseSocketio => {
+  const [socket, setSocket] = useState<Socket>()
   const [isConnected, setIsConnected] = useState<boolean>(false)
   const [lastHashVersion, setLastHashVersion] = useState<number>(-1)
 
-  const update = (elements: readonly ExcalidrawElement[]) => {
+  const update = (elements: readonly ExcalidrawElement[]): void => {
+    if (socket == null) return
+
     const hashVersion = hashElementsVersion(elements)
     console.log('hash version ', elements, hashVersion)
     if (hashVersion === lastHashVersion) return
@@ -25,10 +29,12 @@ export const useSocketio = (projectId: string) => {
     setLastHashVersion(hashVersion)
   }
 
-  const listenSync = (api: ExcalidrawImperativeAPI) => {
+  const listenSync = (api: ExcalidrawImperativeAPI): void => {
+    if (socket == null) return
+
     socket.on('sync', (buffer: ArrayBuffer) => {
-      const data = decodeData(buffer)
-      const { elements, appState } = reconcileData(api, data)
+      const remoteData = decodeData(buffer)
+      const { elements, appState } = reconcileData(api, remoteData.elements)
       api.updateScene({ elements, appState })
     })
   }
@@ -67,44 +73,40 @@ export const useSocketio = (projectId: string) => {
   }, [projectId])
 
   return {
-    update,
+    isConnected,
     listenSync,
-    isConnected
+    update
   }
 }
 
-function decodeData (data: ArrayBuffer): WhiteboardData {
+function decodeData (data: ArrayBuffer): { elements: ExcalidrawElement[] } {
   const decoder = decoding.createDecoder(new Uint8Array(data))
   return decoding.readAny(decoder)
 }
 
-function encodeData (data: WhiteboardData): Uint8Array {
+function encodeData (data: any): Uint8Array {
   const encoder = encoding.createEncoder()
   encoding.writeAny(encoder, data)
   return encoding.toUint8Array(encoder)
 }
 
-function reconcileData (api: ExcalidrawImperativeAPI, remoteData: WhiteboardData) {
+function reconcileData (api: ExcalidrawImperativeAPI, remoteElements: ExcalidrawElement[]): {
+  elements: ExcalidrawElement[]
+  appState: AppState
+} {
   const localElements = api.getSceneElementsIncludingDeleted()
   const localState = api.getAppState()
 
   const localElementMap = arrayToMap(localElements)
   const converged = new Map<string, ExcalidrawElement>()
 
-  remoteData.elements.forEach((remoteElement) => {
+  remoteElements.forEach((remoteElement) => {
     if (converged.has(remoteElement.id)) return
 
-    if (localElementMap.has(remoteElement.id)) {
-      // element exists in both local and remote
-      const localElement = localElementMap.get(remoteElement.id)!
-      if (shouldDiscardRemoteElement(localElement, localState, remoteElement)) {
-        converged.set(localElement.id, localElement)
-      } else {
-        converged.set(remoteElement.id, remoteElement)
-      }
-      converged.set(remoteElement.id, remoteElement)
+    const localElement = localElementMap.get(remoteElement.id)
+    if (shouldDiscardRemoteElement(localElement, localState, remoteElement)) {
+      converged.set(localElement.id, localElement)
     } else {
-      // newly added remote element
       converged.set(remoteElement.id, remoteElement)
     }
   })
@@ -130,12 +132,18 @@ function arrayToMap (elements: readonly ExcalidrawElement[]): Map<string, Excali
   }, new Map<string, ExcalidrawElement>())
 }
 
-function shouldDiscardRemoteElement (local: ExcalidrawElement, localState: AppState, remote: ExcalidrawElement): boolean {
+function shouldDiscardRemoteElement (local: ExcalidrawElement | undefined, localState: AppState, remote: ExcalidrawElement): local is ExcalidrawElement {
   return (
-    isLocalElementEditing(local, localState) ||
-    local.version > remote.version ||
-    (local.version === remote.version &&
-      local.versionNonce < remote.versionNonce
+    // element exist in both local and remote
+    !(local == null) && (
+      // element is being edited in local
+      isLocalElementEditing(local, localState) ||
+      // local element has latest version
+      local.version > remote.version ||
+      (local.version === remote.version &&
+        // take low versionNonce, if version is equal
+        local.versionNonce < remote.versionNonce
+      )
     )
   )
 }

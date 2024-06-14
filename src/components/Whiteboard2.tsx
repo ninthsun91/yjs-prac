@@ -16,32 +16,28 @@ const projectId = 'project-id'
 export function Whiteboard2 () {
   const [excalidrawAPI, excalidrawRefCallback] = useCallbackRefState<ExcalidrawImperativeAPI>()
   const [cursor, setCursor] = useState<'up' | 'down'>('up')
-  const { isConnected, listenSync, update } = useSocketio(projectId)
+  const io = useSocketio(projectId)
   const db = useIndexeddb(projectId)
 
   const onChangeHandler = (elements: readonly ExcalidrawElement[], state: AppState, files: BinaryFiles) => {
     if (cursor === 'down' && state.cursorButton === 'up') {
-      update(elements)
+      io.update(elements)
       db.set({ elements, state, files })
     }
     if (cursor !== state.cursorButton) setCursor(state.cursorButton)
   }
 
   const addSocketListeners = useCallback(() => {
-    listenSync(excalidrawAPI!)
-  }, [excalidrawAPI, listenSync])
+    io.listenSync(excalidrawAPI!)
+  }, [excalidrawAPI, io])
 
   useEffect(() => {
-    if (excalidrawAPI == null || !isConnected) return
+    if (excalidrawAPI == null || !io.isConnected) return
 
     addSocketListeners()
-  }, [excalidrawAPI, isConnected, addSocketListeners])
+  }, [excalidrawAPI, io.isConnected, addSocketListeners])
 
-  const updateScene = () => {
-    const elements = excalidrawAPI!.getSceneElements()
-    update(elements)
-  }
-
+  const updateScene = () => io.update(excalidrawAPI!.getSceneElements())
   useDocumentEventListener('focusout', updateScene)
   useDocumentEventListener('keydown', (e) => {
     if (e.key === 'Backspace' || e.key === 'Delete') updateScene()
