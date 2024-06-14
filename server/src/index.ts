@@ -13,11 +13,11 @@ interface WhiteboardData {
 }
 
 class DB {
-  constructor (
+  constructor(
     private readonly db: Map<ProjectID, WhiteboardData>
   ) { }
 
-  public get (roomID: ProjectID): WhiteboardData {
+  public get(roomID: ProjectID): WhiteboardData {
     const data = this.db.get(roomID)
     if (data != null) return data
 
@@ -66,17 +66,34 @@ io.on('connection', async (socket) => {
     const size = io.sockets.adapter.rooms.get(projectId)?.size || 0
     callback(size)
   })
+
+  socket.on('fetch-data', async (callback) => {
+    const room = io.sockets.adapter.rooms.get(projectId)
+    if (!room) return callback({ elements: [] })
+
+    let askTo = '';
+    const users = room.values()
+    while (askTo === '') {
+      const user = users.next()
+      if (user.value === socket.id) continue;
+
+      askTo = user.value
+    }
+
+    const data = await socket.emitWithAck('fetch-data')
+    callback(data)
+  })
 })
 
 io.listen(3333)
 
-function encodeData (data: WhiteboardData): Uint8Array {
+function encodeData(data: WhiteboardData): Uint8Array {
   const encoder = encoding.createEncoder()
   encoding.writeAny(encoder, data)
   return encoding.toUint8Array(encoder)
 }
 
-function decodeData (buffer: Uint8Array): WhiteboardData {
+function decodeData(buffer: Uint8Array): WhiteboardData {
   const decoder = decoding.createDecoder(buffer)
   return decoding.readAny(decoder)
 }

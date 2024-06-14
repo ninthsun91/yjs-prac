@@ -13,7 +13,7 @@ import type { ExcalidrawElement } from '@excalidraw/excalidraw/types/element/typ
 
 const projectId = 'project-id'
 
-export function Whiteboard2 () {
+export function Whiteboard2() {
   const [excalidrawAPI, excalidrawRefCallback] = useCallbackRefState<ExcalidrawImperativeAPI>()
   const [cursor, setCursor] = useState<'up' | 'down'>('up')
   const io = useSocketio(projectId)
@@ -27,15 +27,23 @@ export function Whiteboard2 () {
     if (cursor !== state.cursorButton) setCursor(state.cursorButton)
   }
 
+  const fetchInitialData = useCallback(async () => {
+    const data = await io.fetchData()
+    excalidrawAPI?.updateScene(data)
+  }, [io])
+
   const addSocketListeners = useCallback(() => {
+    console.log('add socket.io listeners')
     io.listenSync(excalidrawAPI!)
-  }, [excalidrawAPI, io])
+    io.listenFetchData(db.get)
+  }, [excalidrawAPI, io, db.get])
 
   useEffect(() => {
-    if (excalidrawAPI == null || !io.isConnected) return
-
+    console.log('use effect', io.isConnected)
+    if (!io.isConnected) return
     addSocketListeners()
-  }, [excalidrawAPI, io.isConnected, addSocketListeners])
+
+  }, [io, addSocketListeners])
 
   const updateScene = () => io.update(excalidrawAPI!.getSceneElements())
   useDocumentEventListener('focusout', updateScene)

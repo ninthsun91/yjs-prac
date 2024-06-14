@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Socket, io } from 'socket.io-client'
 import * as encoding from 'lib0/encoding'
 import * as decoding from 'lib0/decoding'
@@ -9,35 +9,62 @@ const CONNECTION_URL = 'http://localhost:3333'
 
 interface UseSocketio {
   isConnected: boolean
+  fetchData: () => Promise<{ elements: ExcalidrawElement[] }>
+  listenFetchData: (cb: () => Promise<{ elements: ExcalidrawElement[] }>) => void
   listenSync: (api: ExcalidrawImperativeAPI) => void
   update: (elements: readonly ExcalidrawElement[]) => void
 }
 
 export const useSocketio = (projectId: string): UseSocketio => {
+  const lastHashVersion = useRef<number>(-1)
+
   const [socket, setSocket] = useState<Socket>()
   const [isConnected, setIsConnected] = useState<boolean>(false)
-  const [lastHashVersion, setLastHashVersion] = useState<number>(-1)
 
-  const update = (elements: readonly ExcalidrawElement[]): void => {
+  const update = useCallback((elements: readonly ExcalidrawElement[]): void => {
     if (socket == null) return
 
     const hashVersion = hashElementsVersion(elements)
     console.log('hash version ', elements, hashVersion)
-    if (hashVersion === lastHashVersion) return
+    if (hashVersion === lastHashVersion.current) return
 
     socket.emit('update', encodeData({ elements }))
-    setLastHashVersion(hashVersion)
-  }
+    lastHashVersion.current = hashVersion
+    // setLastHashVersion(hashVersion)
+  }, [socket])
 
-  const listenSync = (api: ExcalidrawImperativeAPI): void => {
-    if (socket == null) return
-
-    socket.on('sync', (buffer: ArrayBuffer) => {
+  const listenSync = useCallback((api: ExcalidrawImperativeAPI): void => {
+    socket?.on('sync', (buffer: ArrayBuffer) => {
       const remoteData = decodeData(buffer)
       const { elements, appState } = reconcileData(api, remoteData.elements)
       api.updateScene({ elements, appState })
     })
-  }
+  }, [socket])
+
+  const listenFetchData = useCallback((cb: () => Promise<{ elements: ExcalidrawElement[] }>): void => {
+    socket?.on('fetch-data', async (callback) => {
+      const { elements } = await cb()
+      callback({ elements })
+    })
+  }, [socket])
+
+  const fetchData = useCallback(async (): Promise<{ elements: ExcalidrawElement[] }> => {
+    if (socket == null) throw new Error()
+
+    const size = await socket.emitWithAck('room-size')
+    if (size === 0) throw new Error()
+
+    if (size === 1) {
+      console.log('should fetch data from server')
+      return {
+        elements: []
+      }
+    } else {
+      console.log('should fetch data from peers')
+      const data = await socket.emitWithAck('fetch-data')
+      return data;
+    }
+  }, [socket])
 
   useEffect(() => {
     const socket = io(CONNECTION_URL, {
@@ -51,15 +78,6 @@ export const useSocketio = (projectId: string): UseSocketio => {
     socket.on('connect', async () => {
       console.log('socket.io connected', socket.id)
       setIsConnected(true)
-
-      const size = await socket.emitWithAck('room-size')
-      if (size === 1) {
-        console.log('should fetch data from server')
-      } else if (size === 0) {
-        console.log('something went wrong... room size cannot be 0')
-      } else {
-        console.log('should fetch data from peers')
-      }
     })
     setSocket(socket)
 
@@ -74,23 +92,25 @@ export const useSocketio = (projectId: string): UseSocketio => {
 
   return {
     isConnected,
+    fetchData,
+    listenFetchData,
     listenSync,
     update
   }
 }
 
-function decodeData (data: ArrayBuffer): { elements: ExcalidrawElement[] } {
+function decodeData(data: ArrayBuffer): { elements: ExcalidrawElement[] } {
   const decoder = decoding.createDecoder(new Uint8Array(data))
   return decoding.readAny(decoder)
 }
 
-function encodeData (data: any): Uint8Array {
+function encodeData(data: any): Uint8Array {
   const encoder = encoding.createEncoder()
   encoding.writeAny(encoder, data)
   return encoding.toUint8Array(encoder)
 }
 
-function reconcileData (api: ExcalidrawImperativeAPI, remoteElements: ExcalidrawElement[]): {
+function reconcileData(api: ExcalidrawImperativeAPI, remoteElements: ExcalidrawElement[]): {
   elements: ExcalidrawElement[]
   appState: AppState
 } {
@@ -125,14 +145,14 @@ function reconcileData (api: ExcalidrawImperativeAPI, remoteElements: Excalidraw
   }
 }
 
-function arrayToMap (elements: readonly ExcalidrawElement[]): Map<string, ExcalidrawElement> {
+function arrayToMap(elements: readonly ExcalidrawElement[]): Map<string, ExcalidrawElement> {
   return elements.reduce((acc, element) => {
     acc.set(element.id, element)
     return acc
   }, new Map<string, ExcalidrawElement>())
 }
 
-function shouldDiscardRemoteElement (local: ExcalidrawElement | undefined, localState: AppState, remote: ExcalidrawElement): local is ExcalidrawElement {
+function shouldDiscardRemoteElement(local: ExcalidrawElement | undefined, localState: AppState, remote: ExcalidrawElement): local is ExcalidrawElement {
   return (
     // element exist in both local and remote
     !(local == null) && (
@@ -148,7 +168,7 @@ function shouldDiscardRemoteElement (local: ExcalidrawElement | undefined, local
   )
 }
 
-function isLocalElementEditing (local: ExcalidrawElement, localState: AppState): boolean {
+function isLocalElementEditing(local: ExcalidrawElement, localState: AppState): boolean {
   return (
     local.id === localState.editingElement?.id ||
     local.id === localState.resizingElement?.id ||
@@ -156,7 +176,7 @@ function isLocalElementEditing (local: ExcalidrawElement, localState: AppState):
   )
 }
 
-function hashElementsVersion (elements: readonly ExcalidrawElement[]): number {
+function hashElementsVersion(elements: readonly ExcalidrawElement[]): number {
   let hash = 5381
   elements.forEach((element) => {
     hash = (hash << 5) + hash + element.versionNonce
