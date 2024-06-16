@@ -14,7 +14,7 @@ export class WhiteboardSync {
   private readonly socket: Socket
   private readonly api: ExcalidrawImperativeAPI
 
-  constructor (api: ExcalidrawImperativeAPI, projectId: string) {
+  constructor(api: ExcalidrawImperativeAPI, projectId: string) {
     this.disconnect()
     const url = 'http://localhost:3333'
 
@@ -28,14 +28,14 @@ export class WhiteboardSync {
     })
   }
 
-  static getInstance (api: ExcalidrawImperativeAPI, projectId: string): WhiteboardSync {
+  static getInstance(api: ExcalidrawImperativeAPI, projectId: string): WhiteboardSync {
     if (!WhiteboardSync.instance) {
       WhiteboardSync.instance = new WhiteboardSync(api, projectId)
     }
     return WhiteboardSync.instance
   }
 
-  public async connect () {
+  public async connect() {
     return await new Promise<number>((resolve) => {
       this.socket.connect()
       this.socket.on('connect', async () => {
@@ -46,11 +46,18 @@ export class WhiteboardSync {
     })
   }
 
-  public disconnect () {
-    if (this.socket?.connected) this.socket.disconnect()
+  public async disconnect() {
+    if (this.socket?.connected) {
+      const count = await this.socket.emitWithAck('prepare-disconnect')
+      console.log('disconnecting... room left: ', count)
+      if (count === 0) {
+        // save elements and files to server
+      }
+      this.socket.disconnect()
+    }
   }
 
-  public listen (
+  public listen(
     save: (data: WhiteboardData) => Promise<void>,
     load: () => Promise<WhiteboardData>
   ) {
@@ -73,7 +80,7 @@ export class WhiteboardSync {
     })
   }
 
-  public update (elements: readonly ExcalidrawElement[]): void {
+  public update(elements: readonly ExcalidrawElement[]): void {
     const hashVersion = hashElementsVersion(elements)
     console.log('update hash', hashVersion)
     if (hashVersion === this.lastHashVersion) return
@@ -82,24 +89,24 @@ export class WhiteboardSync {
     this.lastHashVersion = hashVersion
   }
 
-  public async fetchFromPeer (): Promise<WhiteboardData> {
+  public async fetchFromPeer(): Promise<WhiteboardData> {
     const data = await this.socket.emitWithAck('fetch-peer')
     return decode(data)
   }
 }
 
-function decode (data: ArrayBuffer): { elements: ExcalidrawElement[] } {
+function decode(data: ArrayBuffer): { elements: ExcalidrawElement[] } {
   const decoder = decoding.createDecoder(new Uint8Array(data))
   return decoding.readAny(decoder)
 }
 
-function encode (data: any): Uint8Array {
+function encode(data: any): Uint8Array {
   const encoder = encoding.createEncoder()
   encoding.writeAny(encoder, data)
   return encoding.toUint8Array(encoder)
 }
 
-function reconcileData (api: ExcalidrawImperativeAPI, remoteElements: ExcalidrawElement[]): {
+function reconcileData(api: ExcalidrawImperativeAPI, remoteElements: ExcalidrawElement[]): {
   elements: ExcalidrawElement[]
   appState: AppState
 } {
@@ -134,14 +141,14 @@ function reconcileData (api: ExcalidrawImperativeAPI, remoteElements: Excalidraw
   }
 }
 
-function arrayToMap (elements: readonly ExcalidrawElement[]): Map<string, ExcalidrawElement> {
+function arrayToMap(elements: readonly ExcalidrawElement[]): Map<string, ExcalidrawElement> {
   return elements.reduce((acc, element) => {
     acc.set(element.id, element)
     return acc
   }, new Map<string, ExcalidrawElement>())
 }
 
-function shouldDiscardRemoteElement (local: ExcalidrawElement | undefined, localState: AppState, remote: ExcalidrawElement): local is ExcalidrawElement {
+function shouldDiscardRemoteElement(local: ExcalidrawElement | undefined, localState: AppState, remote: ExcalidrawElement): local is ExcalidrawElement {
   return (
     // element exist in both local and remote
     !(local == null) && (
@@ -157,7 +164,7 @@ function shouldDiscardRemoteElement (local: ExcalidrawElement | undefined, local
   )
 }
 
-function isLocalElementEditing (local: ExcalidrawElement, localState: AppState): boolean {
+function isLocalElementEditing(local: ExcalidrawElement, localState: AppState): boolean {
   return (
     local.id === localState.editingElement?.id ||
     local.id === localState.resizingElement?.id ||
@@ -165,7 +172,7 @@ function isLocalElementEditing (local: ExcalidrawElement, localState: AppState):
   )
 }
 
-function hashElementsVersion (elements: readonly ExcalidrawElement[]): number {
+function hashElementsVersion(elements: readonly ExcalidrawElement[]): number {
   let hash = 5381
   elements.forEach((element) => {
     hash = (hash << 5) + hash + element.versionNonce

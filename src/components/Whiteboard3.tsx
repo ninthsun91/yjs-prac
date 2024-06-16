@@ -11,6 +11,7 @@ import { useIndexeddb } from '@/hooks/useIndexedDB'
 
 import type { AppState, BinaryFiles, ExcalidrawImperativeAPI } from '@excalidraw/excalidraw/types/types'
 import type { ExcalidrawElement } from '@excalidraw/excalidraw/types/element/types'
+import { useWindowEventListener } from '@/hooks/useWindowEventListener'
 
 const projectId = 'project-id'
 
@@ -88,12 +89,20 @@ export function Whiteboard3() {
     }
   })
 
+  useWindowEventListener('beforeunload', () => {
+    sync?.disconnect()
+  })
+
   useEffect(() => {
     console.log('useEffect', excalidrawAPI?.id, db.connected)
     if ((excalidrawAPI == null) || !db.connected) return
 
     const sync = WhiteboardSync.getInstance(excalidrawAPI, projectId)
     init(sync)
+
+    return () => {
+      sync.disconnect()
+    }
   }, [excalidrawAPI, db.connected, init])
 
   return (

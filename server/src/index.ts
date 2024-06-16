@@ -13,11 +13,11 @@ interface WhiteboardData {
 }
 
 class DB {
-  constructor (
+  constructor(
     private readonly db: Map<ProjectID, WhiteboardData>
   ) { }
 
-  public get (roomID: ProjectID): WhiteboardData {
+  public get(roomID: ProjectID): WhiteboardData {
     const data = this.db.get(roomID)
     if (data != null) return data
 
@@ -69,7 +69,7 @@ io.on('connection', async (socket) => {
 
   socket.on('fetch-peer', async (callback) => {
     const room = io.sockets.adapter.rooms.get(projectId)
-    if (room == null) return callback({ elements: [] })
+    if (!room) return callback({ elements: [] })
 
     let askTo = ''
     const users = room.values()
@@ -85,17 +85,30 @@ io.on('connection', async (socket) => {
     const data = await targetSocket.emitWithAck('fetch-data')
     callback(data)
   })
+
+  socket.on('prepare-disconnect', (callback) => {
+    socket.leave(projectId)  // doesn't need await, if using default adapter
+    const room = io.sockets.adapter.rooms.get(projectId)
+    console.log('prepare disconnect', room)
+    if (!room) return callback(0)
+
+    callback(room.size)
+  })
+
+  socket.on('disconnect', (reason) => {
+    console.log('disconnect: ', socket.id, reason)
+  })
 })
 
 io.listen(3333)
 
-function encodeData (data: WhiteboardData): Uint8Array {
+function encodeData(data: WhiteboardData): Uint8Array {
   const encoder = encoding.createEncoder()
   encoding.writeAny(encoder, data)
   return encoding.toUint8Array(encoder)
 }
 
-function decodeData (buffer: Uint8Array): WhiteboardData {
+function decodeData(buffer: Uint8Array): WhiteboardData {
   const decoder = decoding.createDecoder(buffer)
   return decoding.readAny(decoder)
 }
