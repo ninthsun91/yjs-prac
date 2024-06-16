@@ -67,7 +67,7 @@ io.on('connection', async (socket) => {
     callback(size)
   })
 
-  socket.on('fetch-data', async (callback) => {
+  socket.on('fetch-peer', async (callback) => {
     const room = io.sockets.adapter.rooms.get(projectId)
     if (room == null) return callback({ elements: [] })
 
@@ -80,7 +80,9 @@ io.on('connection', async (socket) => {
       askTo = user.value
     }
 
-    const data = await socket.emitWithAck('fetch-data')
+    const targetSocket = io.sockets.sockets.get(askTo)
+    if (targetSocket === undefined) return callback({ elements: [] })
+    const data = await targetSocket.emitWithAck('fetch-data')
     callback(data)
   })
 })

@@ -56,7 +56,7 @@ export class WhiteboardSync {
   ) {
     console.log('add socket.io listeners')
     this.socket.on('sync', async (buffer: ArrayBuffer) => {
-      const remoteData = decodeData(buffer)
+      const remoteData = decode(buffer)
       const { elements, appState } = reconcileData(this.api, remoteData.elements)
       this.api.updateScene({ elements, appState })
 
@@ -67,28 +67,33 @@ export class WhiteboardSync {
       })
     })
 
-    this.socket.on('fetch-data', (callback) => { })
+    this.socket.on('fetch-data', async (callback) => {
+      const data = await load()
+      callback(encode(data))
+    })
   }
 
   public update (elements: readonly ExcalidrawElement[]): void {
     const hashVersion = hashElementsVersion(elements)
+    console.log('update hash', hashVersion)
     if (hashVersion === this.lastHashVersion) return
 
-    this.socket.emit('update', encodeData({ elements }))
+    this.socket.emit('update', encode({ elements }))
     this.lastHashVersion = hashVersion
   }
 
-  public async fetchFromPeer (): Promise<{ elements: ExcalidrawElement[] }> {
-    return { elements: [] }
+  public async fetchFromPeer (): Promise<WhiteboardData> {
+    const data = await this.socket.emitWithAck('fetch-peer')
+    return decode(data)
   }
 }
 
-function decodeData (data: ArrayBuffer): { elements: ExcalidrawElement[] } {
+function decode (data: ArrayBuffer): { elements: ExcalidrawElement[] } {
   const decoder = decoding.createDecoder(new Uint8Array(data))
   return decoding.readAny(decoder)
 }
 
-function encodeData (data: any): Uint8Array {
+function encode (data: any): Uint8Array {
   const encoder = encoding.createEncoder()
   encoding.writeAny(encoder, data)
   return encoding.toUint8Array(encoder)

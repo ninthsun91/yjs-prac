@@ -29,6 +29,7 @@ export function Whiteboard3 () {
 
   const onChangeHandler = (elements: readonly ExcalidrawElement[], state: AppState, files: BinaryFiles) => {
     if (cursor === 'down' && state.cursorButton === 'up') {
+      console.log('onChange', sync)
       sync?.update(elements)
       db.set({ elements })
     }
@@ -38,11 +39,13 @@ export function Whiteboard3 () {
   const init = useCallback(async (sync: WhiteboardSync) => {
     console.log('init!!')
     const data = await fetchInitialData(sync)
+    console.log('fetched data', data)
     excalidrawAPI?.updateScene(data)
 
     sync.listen(db.set, db.get)
 
     setSync(sync)
+    console.log('sync set')
   }, [excalidrawAPI, db.get, db.set])
 
   const fetchInitialData = async (sync: WhiteboardSync): Promise<{ elements: ExcalidrawElement[] }> => {
