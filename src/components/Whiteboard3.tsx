@@ -7,11 +7,10 @@ import { Excalidraw } from '@excalidraw/excalidraw'
 import { useCallbackRefState } from '@/hooks/useCallbackStateRef'
 import { useDocumentEventListener } from '@/hooks/useDocumentEventListener'
 import { WhiteboardSync } from './WhiteboardSync'
-import { WhiteboardDB } from './WhiteboardDB'
+import { useIndexeddb } from '@/hooks/useIndexedDB'
 
 import type { AppState, BinaryFiles, ExcalidrawImperativeAPI } from '@excalidraw/excalidraw/types/types'
 import type { ExcalidrawElement } from '@excalidraw/excalidraw/types/element/types'
-import { useIndexeddb } from '@/hooks/useIndexedDB'
 
 const projectId = 'project-id'
 
@@ -21,7 +20,17 @@ export interface WhiteboardData<T = ExcalidrawElement[]> {
   // files: BinaryFiles
 }
 
-export function Whiteboard3 () {
+async function fetchFromServer(projectId: string, load: () => Promise<WhiteboardData>) {
+  try {
+    const response = await fetch(`https://test.meshed3d.com/api/v1/whiteboards/${projectId}`)
+    if (response.status !== 200) throw new Error();
+    return { elements: [] }
+  } catch (error) {
+    return await load()
+  }
+}
+
+export function Whiteboard3() {
   const [excalidrawAPI, excalidrawRefCallback] = useCallbackRefState<ExcalidrawImperativeAPI>()
   const [sync, setSync] = useState<WhiteboardSync>()
   const [cursor, setCursor] = useState<'up' | 'down'>('up')
@@ -29,7 +38,6 @@ export function Whiteboard3 () {
 
   const onChangeHandler = (elements: readonly ExcalidrawElement[], state: AppState, files: BinaryFiles) => {
     if (cursor === 'down' && state.cursorButton === 'up') {
-      console.log('onChange', sync)
       sync?.update(elements)
       db.set({ elements })
     }
@@ -37,27 +45,22 @@ export function Whiteboard3 () {
   }
 
   const init = useCallback(async (sync: WhiteboardSync) => {
-    console.log('init!!')
-    const data = await fetchInitialData(sync)
-    console.log('fetched data', data)
+    const data = await (async () => {
+      const connectedUserCount = await sync.connect()
+      if (connectedUserCount > 1) {
+        console.log('fetch initial data from peers')
+        return await sync.fetchFromPeer()
+      } else {
+        console.log('fetch initial data from server')
+        return await fetchFromServer(projectId, db.get)
+      }
+    })()
     excalidrawAPI?.updateScene(data)
 
     sync.listen(db.set, db.get)
 
     setSync(sync)
-    console.log('sync set')
   }, [excalidrawAPI, db.get, db.set])
-
-  const fetchInitialData = async (sync: WhiteboardSync): Promise<{ elements: ExcalidrawElement[] }> => {
-    const connectedUserCount = await sync.connect()
-    if (connectedUserCount > 1) {
-      console.log('fetch initial data from peers')
-      return await sync.fetchFromPeer()
-    } else {
-      console.log('fetch initial data from server')
-      return { elements: [] }
-    }
-  }
 
   const updateScene = () => {
     const elements = excalidrawAPI!.getSceneElements()
