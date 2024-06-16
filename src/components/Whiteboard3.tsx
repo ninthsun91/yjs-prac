@@ -24,9 +24,10 @@ async function fetchFromServer(projectId: string, load: () => Promise<Whiteboard
   try {
     const response = await fetch(`https://test.meshed3d.com/api/v1/whiteboards/${projectId}`)
     if (response.status !== 200) throw new Error();
-    return { elements: [] }
+    return { elements: [], files: 's3/key' }
   } catch (error) {
     return await load()
+    // should return elements and s3 key
   }
 }
 
@@ -37,11 +38,18 @@ export function Whiteboard3() {
   const db = useIndexeddb(projectId)
 
   const onChangeHandler = (elements: readonly ExcalidrawElement[], state: AppState, files: BinaryFiles) => {
-    if (cursor === 'down' && state.cursorButton === 'up') {
+    const onClick = cursor === 'down' && state.cursorButton === 'up'
+    if (onClick) {
       sync?.update(elements)
       db.set({ elements })
     }
     if (cursor !== state.cursorButton) setCursor(state.cursorButton)
+
+    if (state.activeTool.type === 'image' && onClick) {
+      console.log('image added', files)
+      // upload files to s3
+      // update s3 key in indexed db
+    }
   }
 
   const init = useCallback(async (sync: WhiteboardSync) => {
@@ -57,6 +65,9 @@ export function Whiteboard3() {
     })()
     excalidrawAPI?.updateScene(data)
 
+    // fetch file data from s3 key, and update files
+    // excalidrawAPI?.addFiles(files)
+
     sync.listen(db.set, db.get)
 
     setSync(sync)
@@ -69,7 +80,12 @@ export function Whiteboard3() {
   }
   useDocumentEventListener('focusout', updateScene)
   useDocumentEventListener('keydown', (e) => {
-    if (e.key === 'Backspace' || e.key === 'Delete') updateScene()
+    if (e.code === 'Backspace' || e.code === 'Delete') updateScene()
+    if (e.code === 'KeyV' && (e.ctrlKey || e.metaKey)) {
+      console.log('image pasted', excalidrawAPI?.getFiles())
+      // upload files to s3
+      // update s3 key in indexed db
+    }
   })
 
   useEffect(() => {
