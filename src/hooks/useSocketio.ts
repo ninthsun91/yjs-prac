@@ -5,7 +5,7 @@ import * as decoding from 'lib0/decoding'
 import type { AppState, BinaryFiles, ExcalidrawImperativeAPI } from '@excalidraw/excalidraw/types/types'
 import type { ExcalidrawElement } from '@excalidraw/excalidraw/types/element/types'
 
-const CONNECTION_URL = 'http://localhost:3333'
+const CONNECTION_URL = 'https://e8f4092340f1.ngrok.app'
 
 interface UseSocketio {
   isConnected: boolean
@@ -99,18 +99,18 @@ export const useSocketio = (projectId: string): UseSocketio => {
   }
 }
 
-function decodeData (data: ArrayBuffer): { elements: ExcalidrawElement[] } {
+function decodeData(data: ArrayBuffer): { elements: ExcalidrawElement[] } {
   const decoder = decoding.createDecoder(new Uint8Array(data))
   return decoding.readAny(decoder)
 }
 
-function encodeData (data: any): Uint8Array {
+function encodeData(data: any): Uint8Array {
   const encoder = encoding.createEncoder()
   encoding.writeAny(encoder, data)
   return encoding.toUint8Array(encoder)
 }
 
-function reconcileData (api: ExcalidrawImperativeAPI, remoteElements: ExcalidrawElement[]): {
+function reconcileData(api: ExcalidrawImperativeAPI, remoteElements: ExcalidrawElement[]): {
   elements: ExcalidrawElement[]
   appState: AppState
 } {
@@ -145,14 +145,14 @@ function reconcileData (api: ExcalidrawImperativeAPI, remoteElements: Excalidraw
   }
 }
 
-function arrayToMap (elements: readonly ExcalidrawElement[]): Map<string, ExcalidrawElement> {
+function arrayToMap(elements: readonly ExcalidrawElement[]): Map<string, ExcalidrawElement> {
   return elements.reduce((acc, element) => {
     acc.set(element.id, element)
     return acc
   }, new Map<string, ExcalidrawElement>())
 }
 
-function shouldDiscardRemoteElement (local: ExcalidrawElement | undefined, localState: AppState, remote: ExcalidrawElement): local is ExcalidrawElement {
+function shouldDiscardRemoteElement(local: ExcalidrawElement | undefined, localState: AppState, remote: ExcalidrawElement): local is ExcalidrawElement {
   return (
     // element exist in both local and remote
     !(local == null) && (
@@ -168,7 +168,7 @@ function shouldDiscardRemoteElement (local: ExcalidrawElement | undefined, local
   )
 }
 
-function isLocalElementEditing (local: ExcalidrawElement, localState: AppState): boolean {
+function isLocalElementEditing(local: ExcalidrawElement, localState: AppState): boolean {
   return (
     local.id === localState.editingElement?.id ||
     local.id === localState.resizingElement?.id ||
@@ -176,7 +176,7 @@ function isLocalElementEditing (local: ExcalidrawElement, localState: AppState):
   )
 }
 
-function hashElementsVersion (elements: readonly ExcalidrawElement[]): number {
+function hashElementsVersion(elements: readonly ExcalidrawElement[]): number {
   let hash = 5381
   elements.forEach((element) => {
     hash = (hash << 5) + hash + element.versionNonce

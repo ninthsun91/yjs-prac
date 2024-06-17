@@ -6,12 +6,12 @@ import { Excalidraw } from '@excalidraw/excalidraw'
 
 import { useCallbackRefState } from '@/hooks/useCallbackStateRef'
 import { useDocumentEventListener } from '@/hooks/useDocumentEventListener'
-import { WhiteboardSync } from './WhiteboardSync'
+import { useWindowEventListener } from '@/hooks/useWindowEventListener'
 import { useIndexeddb } from '@/hooks/useIndexedDB'
+import { WhiteboardSync } from './WhiteboardSync'
 
 import type { AppState, BinaryFiles, ExcalidrawImperativeAPI } from '@excalidraw/excalidraw/types/types'
 import type { ExcalidrawElement } from '@excalidraw/excalidraw/types/element/types'
-import { useWindowEventListener } from '@/hooks/useWindowEventListener'
 
 const projectId = 'project-id'
 
